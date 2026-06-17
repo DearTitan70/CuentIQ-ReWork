@@ -16,6 +16,31 @@ El modelo inicial queda centrado en `usuario`. Organizaciones, membresias y role
 | Credito | Obligacion financiera personal. |
 | CuotaCredito | Calendario de pagos de un credito. |
 
+## Implementacion Prisma actual
+
+La primera migracion crea las tablas `planes` y `usuarios`.
+
+### `planes`
+
+- `id`: UUID.
+- `codigo`: unico; valores iniciales `gratuito`, `mensual`, `anual`.
+- `nombre`.
+- `limite_cuentas`.
+- `limite_transacciones_mes`.
+- `limite_creditos`.
+- `limite_consultas_ia_mes`.
+- `created_at`, `updated_at`.
+
+### `usuarios`
+
+- `id`: UUID.
+- `email`: unico.
+- `password_hash`.
+- `nombre`.
+- `moneda_base`: enum `COP` o `USD`, por defecto `COP`.
+- `plan_id`: relacion obligatoria con `planes.id`.
+- `created_at`, `updated_at`.
+
 ## Relaciones y cardinalidad
 
 ```txt
@@ -60,14 +85,19 @@ Credito 1:N CuotaCredito
 - Cuota de credito mayor o igual a cero.
 - Tipo de transaccion controlado por enum.
 - Toda consulta financiera debe filtrar por usuario autenticado.
+- Todo `find`, `update` y `delete` financiero sobre recurso puntual debe filtrar por `id` y `userId`.
 - Las creaciones de cuentas, transacciones, creditos y consultas IA deben validar limites del plan.
 
 ## Estrategia de migracion
 
-1. Planes y usuarios.
+1. Planes y usuarios: implementada en `prisma/migrations/20260617162000_crear_usuarios_y_planes`.
 2. Cuentas y categorias.
 3. Transacciones.
 4. Creditos y cuotas.
+
+## Seed
+
+`prisma/seed.js` carga los planes iniciales con `upsert` por `codigo`, asi que puede ejecutarse mas de una vez sin duplicar planes.
 
 ## Riesgos
 

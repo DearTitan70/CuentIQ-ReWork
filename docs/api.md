@@ -12,6 +12,21 @@ La API queda orientada a usuario individual. No hay rutas de organizaciones, mem
 - Monedas permitidas: `COP`, `USD`.
 - Reportes y proyecciones muestran COP y USD separados.
 - Errores: `{ "codigo": "string", "mensaje": "string" }`.
+- Error de validacion de DTOs: `{ "codigo": "REQUEST_INVALIDO", "mensaje": "La solicitud contiene datos invalidos." }`.
+- Error de email duplicado: `{ "codigo": "EMAIL_YA_REGISTRADO", "mensaje": "El email ya esta registrado." }`.
+- Error de credenciales invalidas: `{ "codigo": "CREDENCIALES_INVALIDAS", "mensaje": "Email o password invalidos." }`.
+- Error de token invalido: `{ "codigo": "TOKEN_INVALIDO", "mensaje": "Token ausente, invalido o expirado." }`.
+- Password minimo para MVP: 8 caracteres.
+- Ningun endpoint financiero acepta `userId` en body o query; el backend usa `request.user.id`.
+
+## Aislamiento de datos
+
+Los endpoints de cuentas, categorias, transacciones, creditos, reportes, proyecciones e IA deben obtener `userId` exclusivamente del usuario autenticado.
+
+- En creacion, asignar `userId` desde `request.user.id`.
+- En lectura, actualizacion y borrado de recursos puntuales, filtrar por `id` y `userId`.
+- En listados y reportes, filtrar por `userId`.
+- La primera implementacion de recurso financiero debe incluir una prueba de acceso cruzado entre dos usuarios.
 
 ## Endpoints
 
@@ -52,6 +67,7 @@ Disclaimer: Este contenido fue generado con asistencia de inteligencia artificia
 
 ## Testing
 
+- Suite minima Auth: `npm test`.
 - Prueba de autenticacion para endpoints protegidos.
 - Prueba de acceso cruzado entre usuarios.
 - Prueba de validacion de montos, fechas y monedas.

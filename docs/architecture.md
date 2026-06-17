@@ -62,6 +62,10 @@ src/
 - Servicios con reglas de negocio.
 - Prisma para acceso a datos.
 - DTOs para requests y responses.
+- `AuthModule` registra JWT con `JWT_SECRET` desde variables de entorno y expiracion `7d`.
+- La app debe fallar al iniciar si falta `JWT_SECRET`.
+- `JwtStrategy` valida tokens Bearer, respeta expiracion y carga el usuario minimo en `request.user`.
+- Los servicios financieros deben recibir `userId` desde `request.user.id`; nunca desde body o query.
 
 ### Base de datos
 
@@ -208,6 +212,7 @@ Los contratos preliminares estan documentados en `docs/api.md`.
 
 - Usuario autenticado.
 - Recurso pertenece al usuario autenticado.
+- Servicios financieros filtran recursos puntuales por `id` y `userId`.
 - DTO de entrada.
 - Validacion de tipos, montos, fechas, monedas y enums.
 - Respuesta normalizada.
