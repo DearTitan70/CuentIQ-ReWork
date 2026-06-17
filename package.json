@@ -1,0 +1,45 @@
+{
+  "name": "cuentiq-rework",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "test": "node --import tsx --test tests/**/*.test.ts",
+    "prisma:generate": "prisma generate",
+    "db:migrate": "prisma migrate dev",
+    "db:seed": "prisma db seed",
+    "check:tarea1": "node scripts/check-tarea1.js",
+    "check:tarea2": "node scripts/check-tarea2.js",
+    "check:tarea3": "node scripts/check-tarea3.js",
+    "check:tarea4": "node scripts/check-tarea4.js",
+    "check:tarea5": "node scripts/check-tarea5.js",
+    "check:tarea6": "node scripts/check-tarea6.js",
+    "check:tarea7": "node scripts/check-tarea7.js",
+    "check:tarea8": "node scripts/check-tarea8.js",
+    "check:tarea9": "node scripts/check-tarea9.js"
+  },
+  "prisma": {
+    "seed": "node prisma/seed.js"
+  },
+  "dependencies": {
+    "@nestjs/common": "^11.1.3",
+    "@nestjs/config": "^4.0.2",
+    "@nestjs/core": "^11.1.3",
+    "@nestjs/jwt": "^11.0.0",
+    "@nestjs/passport": "^11.0.5",
+    "@nestjs/platform-express": "^11.1.3",
+    "@prisma/client": "^6.9.0",
+    "class-transformer": "^0.5.1",
+    "class-validator": "^0.14.2",
+    "passport": "^0.7.0",
+    "passport-jwt": "^4.0.1",
+    "reflect-metadata": "^0.2.2",
+    "rxjs": "^7.8.2"
+  },
+  "devDependencies": {
+    "@types/passport-jwt": "^4.0.1",
+    "prisma": "^6.9.0",
+    "tsx": "^4.20.3",
+    "typescript": "^5.8.3"
+  }
+}
