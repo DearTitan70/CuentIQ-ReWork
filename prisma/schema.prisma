@@ -1,0 +1,43 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Moneda {
+  COP
+  USD
+}
+
+model Usuario {
+  id           String   @id @default(uuid()) @db.Uuid
+  email        String   @unique
+  passwordHash String   @map("password_hash")
+  nombre       String
+  monedaBase   Moneda   @default(COP) @map("moneda_base")
+  planId       String   @map("plan_id") @db.Uuid
+  plan         Plan     @relation(fields: [planId], references: [id])
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  @@index([planId])
+  @@map("usuarios")
+}
+
+model Plan {
+  id                         String    @id @default(uuid()) @db.Uuid
+  codigo                     String    @unique
+  nombre                     String
+  limiteCuentas              Int       @map("limite_cuentas")
+  limiteTransaccionesMes     Int       @map("limite_transacciones_mes")
+  limiteCreditos             Int       @map("limite_creditos")
+  limiteConsultasIaMes       Int       @map("limite_consultas_ia_mes")
+  createdAt                  DateTime  @default(now()) @map("created_at")
+  updatedAt                  DateTime  @updatedAt @map("updated_at")
+  usuarios                   Usuario[]
+
+  @@map("planes")
+}

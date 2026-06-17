@@ -8,12 +8,12 @@ El proyecto esta en definicion inicial. El alcance MVP ya fue recortado a gestio
 
 - Producto: MVP para personas naturales definido.
 - Arquitectura: monolito modular propuesto.
-- Base de datos: modelo por usuario propuesto, sin schema definitivo.
-- API: endpoints por usuario propuestos, sin DTOs finales.
+- Base de datos: primera migracion Prisma de `planes` y `usuarios` creada.
+- API: registro, login, guard JWT, `GET /auth/me` y contrato de aislamiento por `userId` implementados.
 - Frontend: no iniciado.
-- Backend: no iniciado.
+- Backend: base NestJS minima con `AuthModule`, `AuthController`, `AuthService` y `PrismaService`.
 - Infraestructura: no iniciada.
-- Testing: estrategia inicial definida.
+- Testing: checks locales `npm run check:tarea1` a `npm run check:tarea9`; suite minima Auth con `npm test`.
 
 ## Estructura actual
 
@@ -27,6 +27,24 @@ docs/
 +-- product.md
 +-- project-status.md
 +-- roadmap.md
++-- security.md
++-- tasks.md
+prisma/
++-- schema.prisma
++-- seed.js
++-- migrations/
+scripts/
++-- check-tarea1.js
++-- check-tarea2.js
++-- ...
++-- check-tarea9.js
+src/
++-- app.module.ts
++-- main.ts
++-- auth/
++-- prisma/
+tests/
++-- auth.test.ts
 ```
 
 ## Decisiones cerradas
@@ -55,8 +73,8 @@ No hay pendientes criticos de alcance MVP.
 
 ## Testing
 
-Todavia no hay codigo ejecutable. La primera prueba sera una verificacion minima del entorno cuando se cree el proyecto tecnico.
+La suite minima de Auth corre con `npm test` y cubre registro, login, validacion, guard JWT y ausencia de `passwordHash` en respuestas.
 
 ## Proximos pasos
 
-Crear el proyecto NestJS/React con Prisma.
+Continuar con perfil financiero del usuario o primer recurso financiero.
