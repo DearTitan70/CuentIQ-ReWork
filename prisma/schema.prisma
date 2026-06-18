@@ -12,6 +12,16 @@ enum Moneda {
   USD
 }
 
+enum TipoCuenta {
+  BANCARIA  @map("bancaria")
+  BILLETERA @map("billetera")
+}
+
+enum TipoTransaccion {
+  INGRESO @map("ingreso")
+  GASTO   @map("gasto")
+}
+
 model Usuario {
   id           String   @id @default(uuid()) @db.Uuid
   email        String   @unique
@@ -22,6 +32,8 @@ model Usuario {
   plan         Plan     @relation(fields: [planId], references: [id])
   createdAt    DateTime @default(now()) @map("created_at")
   updatedAt    DateTime @updatedAt @map("updated_at")
+  cuentas      Cuenta[]
+  transacciones Transaccion[]
 
   @@index([planId])
   @@map("usuarios")
@@ -40,4 +52,35 @@ model Plan {
   usuarios                   Usuario[]
 
   @@map("planes")
+}
+
+model Cuenta {
+  usuarioId    String     @map("usuario_id") @db.Uuid
+  id           Int
+  usuario      Usuario    @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+  nombre       String
+  tipo         TipoCuenta
+  moneda       Moneda
+  saldoInicial Decimal    @map("saldo_inicial") @db.Decimal(14, 2)
+  createdAt    DateTime   @default(now()) @map("created_at")
+  updatedAt    DateTime   @updatedAt @map("updated_at")
+  transacciones Transaccion[]
+
+  @@id([usuarioId, id])
+  @@index([usuarioId])
+  @@map("cuentas")
+}
+
+model Transaccion {
+  id        String          @id @default(uuid()) @db.Uuid
+  usuarioId String          @map("usuario_id") @db.Uuid
+  cuentaId  Int             @map("cuenta_id")
+  tipo      TipoTransaccion
+  monto     Decimal         @db.Decimal(14, 2)
+  createdAt DateTime        @default(now()) @map("created_at")
+  usuario   Usuario         @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+  cuenta    Cuenta          @relation(fields: [usuarioId, cuentaId], references: [usuarioId, id], onDelete: Restrict)
+
+  @@index([usuarioId, cuentaId])
+  @@map("transacciones")
 }

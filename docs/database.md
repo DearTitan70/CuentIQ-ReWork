@@ -18,7 +18,7 @@ El modelo inicial queda centrado en `usuario`. Organizaciones, membresias y role
 
 ## Implementacion Prisma actual
 
-La primera migracion crea las tablas `planes` y `usuarios`.
+Las migraciones actuales crean `planes`, `usuarios`, `cuentas` y `transacciones`.
 
 ### `planes`
 
@@ -40,6 +40,22 @@ La primera migracion crea las tablas `planes` y `usuarios`.
 - `moneda_base`: enum `COP` o `USD`, por defecto `COP`.
 - `plan_id`: relacion obligatoria con `planes.id`.
 - `created_at`, `updated_at`.
+
+### `cuentas`
+
+- `usuario_id`: UUID, parte de la llave primaria compuesta y relacion obligatoria con `usuarios.id`.
+- `id`: entero, parte de la llave primaria compuesta. Es scoped por usuario para permitir cuenta por defecto `id = 0` por usuario.
+- `nombre`.
+- `tipo`: enum `TipoCuenta`, valores `bancaria` o `billetera`.
+- `moneda`: enum `Moneda`, valores `COP` o `USD`.
+- `saldo_inicial`: decimal `14,2`.
+- `created_at`, `updated_at`.
+
+`saldo_real` no se persiste: PostgreSQL agrega los movimientos asociados y la API los suma o resta de `saldo_inicial`.
+
+La llave primaria es compuesta (`usuario_id`, `id`): `id = 0` identifica la cuenta principal dentro de cada usuario, no globalmente. La API no permite borrarla.
+
+El registro de usuario crea atomicamente una cuenta `Principal` con `id = 0`, tipo `billetera`, moneda base `COP` y saldo inicial `0`. La cuenta se crea mediante nested write de Prisma, por lo que usuario y cuenta se confirman o revierten juntos.
 
 ## Relaciones y cardinalidad
 
@@ -91,9 +107,10 @@ Credito 1:N CuotaCredito
 ## Estrategia de migracion
 
 1. Planes y usuarios: implementada en `prisma/migrations/20260617162000_crear_usuarios_y_planes`.
-2. Cuentas y categorias.
-3. Transacciones.
-4. Creditos y cuotas.
+2. Cuentas: implementada en `prisma/migrations/20260617173000_crear_cuentas`.
+3. Categorias.
+4. Transacciones: modelo minimo implementado en `prisma/migrations/20260618120000_agregar_transacciones_y_proteger_principal`.
+5. Creditos y cuotas.
 
 ## Seed
 
@@ -115,4 +132,4 @@ Credito 1:N CuotaCredito
 
 ## Proximos pasos
 
-Definir si los contadores mensuales se calculan por consulta o se materializan.
+Implementar categorias y los endpoints de transacciones.
