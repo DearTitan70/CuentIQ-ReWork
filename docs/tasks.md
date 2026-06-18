@@ -1,283 +1,337 @@
-# Tasks - Modulo Auth
+# Tasks - Modulo Cuentas
 
 ## Contexto
 
-Implementar autenticacion para el MVP de CuentiQ como usuario individual. No incluir organizaciones, roles, permisos avanzados ni refresh tokens en esta fase.
+Implementar el primer recurso financiero del MVP: cuentas bancarias y billeteras personales en COP o USD. El modulo debe apoyarse en Auth ya terminado, tomar siempre el usuario desde `request.user.id` y respetar limites por plan.
 
-Stack esperado por los documentos: NestJS, Prisma, PostgreSQL, API REST y React/Vite. El backend debe emitir JWT con expiracion de 7 dias y todas las consultas financieras futuras deben aislar datos por `userId`.
+No incluir frontend todavia: el proyecto indica que React/Vite no esta iniciado. Primero cerrar contrato backend y pruebas; la pantalla de cuentas se agrega cuando exista la base frontend.
 
 ## Dependencias previas
 
-- Proyecto NestJS creado y ejecutando.
-- Prisma configurado contra PostgreSQL.
-- Variables de entorno cargadas para `DATABASE_URL` y `JWT_SECRET`.
-- Librerias habituales de NestJS para JWT, Passport y validacion instaladas.
-- Estrategia de tests basica disponible.
+- Modulo Auth completado.
+- `JwtAuthGuard` disponible para proteger endpoints.
+- Prisma y PostgreSQL funcionando.
+- Planes cargados con limites de cuentas.
+- Formato de errores `{ codigo, mensaje }` definido.
+
+## Decisiones para este modulo
+
+- `Cuenta.id` sera numerico y scoped por usuario para permitir cuenta por defecto `id = 0` en cada usuario.
+- Toda operacion puntual filtrara por `id` y `usuarioId`.
+- La cuenta por defecto `id = 0` se crea automaticamente para cada usuario y no se puede borrar.
+- `saldoInicial` se persiste.
+- `saldoReal` se devuelve calculado, no editable. Mientras no exista `transacciones`, sera igual a `saldoInicial`; al implementar movimientos, se suma/resta desde transacciones.
 
 ## Tareas
 
-### 1. Crear modelo base de usuarios y planes
+### 1. Definir modelo Prisma de cuentas
 
 Estado: completada.
 
-**Objetivo:** dejar la persistencia minima para registrar usuarios y asignar plan gratuito por defecto.
+**Objetivo:** agregar persistencia minima para cuentas personales.
 
 **Detalle:**
 
-- Crear entidades Prisma para `Usuario` y `Plan`.
-- Campos minimos de `Usuario`: `id`, `email`, `passwordHash`, `nombre`, `monedaBase`, `planId`, `createdAt`, `updatedAt`.
-- Crear indice unico para `Usuario.email`.
-- Crear relacion `Plan 1:N Usuario`.
-- Cargar planes iniciales: gratuito, mensual y anual.
-- Definir `monedaBase` por defecto como `COP`.
+- Crear modelo `Cuenta` asociado a `Usuario`.
+- Campos minimos: `usuarioId`, `id`, `nombre`, `tipo`, `moneda`, `saldoInicial`, `createdAt`, `updatedAt`.
+- Usar `id` numerico scoped por usuario para permitir `id = 0` por usuario.
+- Agregar indice por `usuarioId`.
+- Agregar validacion de moneda `COP` o `USD`.
+- Definir tipos iniciales simples: `bancaria` y `billetera`.
 
-**Dependencias:** Prisma y PostgreSQL configurados.
+**Dependencias:** Auth, Prisma y modelo `Usuario`.
 
 **Riesgos:**
 
-- Migracion inicial mal nombrada o dificil de revertir.
-- Seed duplicado de planes si se ejecuta mas de una vez.
+- Si `Cuenta.id` se modela como id global, no se puede tener `id = 0` por usuario.
+- Si se agregan demasiados tipos de cuenta ahora, se abre alcance innecesario.
 
 **Criterios de aceptacion:**
 
-- [x] La migracion crea `usuarios` y `planes`.
-- [x] No se pueden crear dos usuarios con el mismo email.
-- [x] Un usuario nuevo puede quedar asociado al plan gratuito.
-- [x] El seed de planes es idempotente.
+- [x] La migracion crea la tabla `cuentas`.
+- [x] Cada cuenta pertenece a un usuario.
+- [x] Un usuario puede tener una cuenta con `id = 0`.
+- [x] Dos usuarios pueden tener su propia cuenta `id = 0`.
+- [x] La moneda solo acepta `COP` o `USD`.
 
-### 2. Configurar modulo Auth
+### 2. Crear cuenta por defecto al registrar usuario
 
 Estado: completada.
 
-**Objetivo:** crear la estructura minima del modulo `auth`.
+**Objetivo:** asegurar que todo usuario nuevo tenga una cuenta base no eliminable.
 
 **Detalle:**
 
-- Crear `AuthModule`, `AuthController` y `AuthService`.
-- Registrar dependencias necesarias para JWT y acceso a usuarios.
-- Leer `JWT_SECRET` desde variables de entorno.
-- Configurar expiracion del token en 7 dias.
+- Al completar `POST /auth/registro`, crear cuenta `id = 0` para el usuario.
+- Nombre sugerido: `Principal`.
+- Tipo sugerido: `billetera`.
+- Moneda: usar `monedaBase` del usuario.
+- `saldoInicial`: `0`.
+- Crear usuario y cuenta por defecto en una transaccion de base de datos.
+
+**Dependencias:** tarea 1 y registro de Auth.
+
+**Riesgos:**
+
+- Usuario creado sin cuenta si falla la segunda escritura.
+- Duplicar cuenta `id = 0` si el flujo de registro se reintenta mal.
+
+**Criterios de aceptacion:**
+
+- [x] Todo usuario nuevo queda con cuenta `id = 0`.
+- [x] La creacion de usuario falla completa si no se puede crear la cuenta por defecto.
+- [x] La respuesta de registro no expone campos internos de cuenta.
+
+### 3. Implementar DTOs y validaciones de cuentas
+
+Estado: completada.
+
+**Objetivo:** validar requests antes de tocar base de datos.
+
+**Detalle:**
+
+- Crear DTO para `POST /cuentas` con `nombre`, `tipo`, `moneda`, `saldoInicial`.
+- Crear DTO para `PATCH /cuentas/:id` con campos editables.
+- Validar nombre requerido.
+- Validar tipo permitido.
+- Validar moneda `COP` o `USD`.
+- Validar `saldoInicial` numerico.
+- No aceptar `usuarioId`, `saldoReal` ni flags internos desde el request.
 
 **Dependencias:** tarea 1.
 
 **Riesgos:**
 
-- Secreto JWT hardcodeado.
-- Configuracion duplicada entre modulos.
-
-**Criterios de aceptacion:**
-
-- [x] El modulo compila.
-- [x] La expiracion del token queda en `7d`.
-- [x] La app falla de forma clara si falta `JWT_SECRET`.
-
-### 3. Implementar DTOs y validaciones de Auth
-
-Estado: completada.
-
-**Objetivo:** validar entradas antes de tocar base de datos.
-
-**Detalle:**
-
-- Crear DTO para `POST /auth/registro` con `email`, `password`, `nombre`.
-- Crear DTO para `POST /auth/login` con `email`, `password`.
-- Validar email valido, password requerida y nombre requerido.
-- Definir regla minima de password fuerte segun el criterio del equipo antes de implementar.
-
-**Dependencias:** tarea 2.
-
-**Riesgos:**
-
-- Regla de password demasiado estricta para MVP.
-- Mensajes de error inconsistentes con `docs/api.md`.
+- Permitir que el frontend envie `usuarioId`.
+- Permitir editar `saldoReal`, que debe ser calculado.
 
 **Criterios de aceptacion:**
 
 - [x] Requests invalidos responden `400`.
 - [x] El formato de error sigue `{ codigo, mensaje }`.
-- [x] No se ejecuta logica de registro/login con DTO invalido.
+- [x] `usuarioId` enviado por body se ignora o rechaza.
+- [x] `saldoReal` no es aceptado como campo editable.
 
-### 4. Implementar registro de usuario
+### 4. Crear `CuentasModule`, controller y service
 
 Estado: completada.
 
-**Objetivo:** permitir crear usuario con email, password y nombre.
+**Objetivo:** exponer el CRUD minimo de cuentas.
 
 **Detalle:**
 
-- Normalizar email antes de guardar.
-- Hashear password antes de persistir.
-- Crear usuario con plan gratuito y moneda base `COP`.
-- Responder usuario basico y JWT.
-- No devolver `passwordHash`.
-- Mapear email duplicado a `409`.
+- Crear `CuentasModule`, `CuentasController` y `CuentasService`.
+- Proteger todos los endpoints con `JwtAuthGuard`.
+- Obtener `usuarioId` desde `request.user.id`.
+- Implementar:
+  - `POST /cuentas`
+  - `GET /cuentas`
+  - `GET /cuentas/:id`
+  - `PATCH /cuentas/:id`
+  - `DELETE /cuentas/:id`
+- Mantener controladores delgados y reglas en service.
 
-**Dependencias:** tareas 1, 2 y 3.
+**Dependencias:** tareas 1 y 3.
 
 **Riesgos:**
 
-- Guardar password sin hash.
-- Filtrar `passwordHash` por accidente.
-- Condicion de carrera en email duplicado si no se confia en el indice unico.
+- Repetir logica de Auth dentro de Cuentas.
+- Consultar cuentas sin filtro por usuario.
 
 **Criterios de aceptacion:**
 
-- [x] `POST /auth/registro` crea usuario valido.
-- [x] La respuesta incluye token y usuario basico.
-- [x] El token contiene `sub` con el id del usuario.
-- [x] Password queda hasheada en base de datos.
-- [x] Email duplicado responde `409`.
+- [x] Todos los endpoints requieren JWT.
+- [x] Ningun endpoint financiero acepta `userId` desde body o query.
+- [x] Las operaciones puntuales filtran por `id` y `usuarioId`.
+- [x] Recursos inexistentes o de otro usuario responden `404`.
 
-### 5. Implementar inicio de sesion
+### 5. Implementar creacion de cuentas con limite de plan
 
 Estado: completada.
 
-**Objetivo:** emitir JWT para credenciales validas.
+**Objetivo:** permitir crear cuentas respetando el plan del usuario.
 
 **Detalle:**
 
-- Buscar usuario por email normalizado.
-- Comparar password contra `passwordHash`.
-- Responder token y usuario basico.
-- Responder `401` para email inexistente o password incorrecta.
+- Antes de crear, contar cuentas existentes del usuario.
+- Comparar contra `Plan.limiteCuentas`.
+- Asignar el siguiente `id` numerico disponible para ese usuario.
+- Guardar `saldoInicial`.
+- Responder cuenta creada con `saldoReal`.
+
+**Dependencias:** tareas 1, 3 y 4.
+
+**Riesgos:**
+
+- Condicion de carrera al calcular el siguiente `id`.
+- Contar mal la cuenta por defecto dentro del limite.
+
+**Criterios de aceptacion:**
+
+- [x] Un usuario puede crear una cuenta valida.
+- [x] El plan gratuito permite maximo 2 cuentas en total, incluyendo `id = 0`.
+- [x] Al superar el limite responde `429`.
+- [x] La respuesta incluye `saldoInicial` y `saldoReal`.
+
+### 6. Implementar listado y detalle con saldo real calculado
+
+Estado: completada.
+
+**Objetivo:** devolver cuentas del usuario con saldo real no editable.
+
+**Detalle:**
+
+- `GET /cuentas` lista solo cuentas del usuario autenticado.
+- `GET /cuentas/:id` devuelve solo cuenta propia.
+- Incluir `saldoReal` en la respuesta.
+- Mientras no exista `transacciones`, calcular `saldoReal = saldoInicial`.
+- Dejar el calculo encapsulado en una funcion del service para reemplazarlo cuando existan movimientos.
 
 **Dependencias:** tarea 4.
 
 **Riesgos:**
 
-- Mensajes que revelen si el email existe.
-- Comparacion insegura o incorrecta de password.
+- Mezclar COP y USD en calculos futuros.
+- Guardar `saldoReal` y desincronizarlo cuando se borren movimientos.
 
 **Criterios de aceptacion:**
 
-- [x] `POST /auth/login` responde token con credenciales validas.
-- [x] Credenciales invalidas responden `401`.
-- [x] La respuesta no incluye `passwordHash`.
-- [x] El JWT expira en 7 dias.
+- [x] El listado no muestra cuentas de otros usuarios.
+- [x] El detalle de cuenta ajena responde `404`.
+- [x] `saldoReal` se calcula y no se lee desde un campo persistido.
+- [x] Con cero movimientos, `saldoReal` es igual a `saldoInicial`.
 
-### 6. Implementar JwtStrategy y JwtAuthGuard
+### 7. Implementar actualizacion de cuentas
 
 Estado: completada.
 
-**Objetivo:** proteger endpoints usando `Authorization: Bearer <token>`.
+**Objetivo:** editar datos basicos sin romper saldos calculados.
 
 **Detalle:**
 
-- Crear estrategia JWT que valide firma y expiracion.
-- Cargar el usuario autenticado minimo en `request.user`.
-- Crear o exponer `JwtAuthGuard`.
-- Rechazar tokens ausentes, invalidos o expirados con `401`.
+- Permitir editar `nombre` y `tipo`.
+- Permitir editar `moneda` solo si la cuenta no tiene movimientos cuando exista `transacciones`.
+- Permitir editar `saldoInicial`.
+- No permitir cambiar `id`.
+- No permitir cambiar `usuarioId`.
+- No permitir editar `saldoReal`.
 
-**Dependencias:** tareas 2 y 5.
+**Dependencias:** tareas 3, 4 y 6.
 
 **Riesgos:**
 
-- Usar payload sin verificar existencia actual del usuario.
-- Dejar endpoints protegidos aceptando token expirado.
+- Cambiar moneda en una cuenta con movimientos futuros y corromper reportes.
+- Permitir actualizar la cuenta de otro usuario.
 
 **Criterios de aceptacion:**
 
-- [x] Un endpoint protegido rechaza requests sin token.
-- [x] Un endpoint protegido acepta token valido.
-- [x] Token expirado o mal firmado responde `401`.
-- [x] `request.user.id` queda disponible para servicios y controladores.
+- [x] Actualizar cuenta propia responde cuenta actualizada.
+- [x] Actualizar cuenta ajena responde `404`.
+- [x] Cambiar `saldoInicial` recalcula `saldoReal`.
+- [x] `id`, `usuarioId` y `saldoReal` no son editables.
 
-### 7. Implementar `GET /auth/me`
+### 8. Implementar borrado de cuentas
 
 Estado: completada.
 
-**Objetivo:** validar sesion actual y devolver usuario autenticado.
+**Objetivo:** permitir borrar cuentas normales sin borrar la cuenta por defecto.
 
 **Detalle:**
 
-- Crear endpoint `GET /auth/me`.
-- Protegerlo con `JwtAuthGuard`.
-- Responder usuario basico desde `request.user` o base de datos.
-- No devolver datos sensibles.
+- Bloquear `DELETE /cuentas/0`.
+- Borrar solo cuentas propias.
+- Mientras no exista `transacciones`, permitir borrar cuentas sin movimientos.
+- Cuando exista `transacciones`, bloquear borrado si hay movimientos asociados.
+- Responder `409` para cuenta por defecto o cuenta con movimientos.
 
-**Dependencias:** tarea 6.
+**Dependencias:** tarea 4.
 
 **Riesgos:**
 
-- Responder informacion interna del modelo.
+- Borrar `id = 0` deja al usuario sin cuenta base.
+- Borrar cuenta con movimientos rompe balances y reportes.
 
 **Criterios de aceptacion:**
 
-- [x] Sin token responde `401`.
-- [x] Con token valido responde el usuario autenticado.
-- [x] La respuesta no incluye `passwordHash`.
+- [x] Cuenta `id = 0` no se puede borrar.
+- [x] Cuenta propia sin movimientos se puede borrar.
+- [x] Cuenta ajena responde `404`.
+- [x] La proteccion de cuentas con movimientos queda exigida para cuando exista `transacciones`.
 
-### 8. Preparar aislamiento por `userId`
+### 9. Agregar pruebas minimas de cuentas
 
 Estado: completada.
 
-**Objetivo:** dejar el contrato para que los modulos financieros filtren por usuario autenticado.
+**Objetivo:** cubrir reglas criticas del primer recurso financiero.
 
 **Detalle:**
 
-- Documentar que todo servicio financiero debe recibir `userId` desde `request.user.id`.
-- Crear helper/decorador solo si el patron se repite al implementar el segundo endpoint protegido.
-- Definir criterio de propiedad: todo `find`, `update` y `delete` financiero debe filtrar por `id` y `userId`.
+- Probar que registro crea cuenta `id = 0`.
+- Probar creacion de cuenta valida.
+- Probar limite del plan gratuito.
+- Probar listado filtrado por usuario.
+- Probar acceso cruzado entre dos usuarios.
+- Probar que `DELETE /cuentas/0` responde `409`.
+- Probar que `saldoReal` iguala `saldoInicial` sin movimientos.
 
-**Dependencias:** tarea 6.
+**Dependencias:** tareas 2, 4, 5, 6 y 8.
 
 **Riesgos:**
 
-- Confiar en `userId` enviado por el frontend.
-- Olvidar el filtro `userId` en endpoints futuros.
+- Tests demasiado grandes o acoplados a detalles internos.
+- No cubrir aislamiento del primer recurso financiero.
 
 **Criterios de aceptacion:**
 
-- [x] Ningun endpoint financiero planificado acepta `userId` desde body o query.
-- [x] La guia queda clara para cuentas, categorias, transacciones y creditos.
-- [x] Existe al menos una prueba de acceso cruzado cuando se implemente el primer recurso financiero.
+- [x] `npm test` cubre cuentas.
+- [x] Existe prueba de acceso cruzado requerida por `docs/security.md`.
+- [x] La suite falla si se elimina el filtro por `usuarioId`.
+- [x] La suite falla si se permite borrar `id = 0`.
 
-### 9. Agregar pruebas minimas de Auth
+### 10. Actualizar documentacion del modulo
 
 Estado: completada.
 
-**Objetivo:** cubrir el flujo critico sin suite gigante.
+**Objetivo:** mantener docs alineados con la implementacion real.
 
 **Detalle:**
 
-- Probar registro exitoso.
-- Probar email duplicado.
-- Probar login exitoso.
-- Probar login invalido.
-- Probar `GET /auth/me` sin token y con token valido.
-- Probar que la respuesta nunca incluya `passwordHash`.
+- Actualizar `docs/database.md` con campos reales de `Cuenta`.
+- Actualizar `docs/api.md` con DTOs exactos de cuentas.
+- Actualizar `docs/project-status.md` al cerrar el modulo.
+- Registrar decision de `id = 0` scoped por usuario si no queda ya documentada.
 
-**Dependencias:** tareas 4, 5, 6 y 7.
+**Dependencias:** tareas 1 a 9.
 
 **Riesgos:**
 
-- Tests acoplados a detalles internos del JWT.
-- Base de datos de tests no aislada.
+- Docs prometen campos o endpoints que no existen.
+- El criterio `id = 0` queda ambiguo para transacciones.
 
 **Criterios de aceptacion:**
 
-- [x] Las pruebas corren en local.
-- [x] Fallan si se remueve hash de password, guard o expiracion del JWT.
-- [x] Cubren al menos un caso `400`, `401` y `409`.
+- [x] La documentacion coincide con endpoints y modelo reales.
+- [x] Queda claro que `id = 0` es por usuario.
+- [x] Queda claro que `saldoReal` se calcula desde `saldoInicial + movimientos`.
 
 ## Orden recomendado
 
-1. Modelo `Usuario`/`Plan` y seed de planes.
-2. Modulo Auth y configuracion JWT.
+1. Modelo Prisma de cuentas.
+2. Cuenta por defecto en registro.
 3. DTOs.
-4. Registro.
-5. Login.
-6. Guard JWT.
-7. `/auth/me`.
-8. Contrato de aislamiento por `userId`.
+4. Modulo, controller y service.
+5. Crear cuenta con limite de plan.
+6. Listado y detalle con saldo real.
+7. Actualizacion.
+8. Borrado.
 9. Pruebas minimas.
+10. Documentacion.
 
 ## Fuera de alcance
 
-- Refresh tokens.
-- Recuperacion de password.
-- Roles y permisos.
-- Organizaciones o equipos.
-- Login social.
-- Verificacion de email.
-- MFA.
+- Frontend de cuentas, hasta iniciar React/Vite.
+- Integraciones bancarias.
+- Conciliacion bancaria.
+- Transferencias entre cuentas, hasta modulo Transacciones.
+- Saldos convertidos entre COP y USD.
+- Historial/auditoria de cambios de saldo inicial.

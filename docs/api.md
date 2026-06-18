@@ -16,6 +16,8 @@ La API queda orientada a usuario individual. No hay rutas de organizaciones, mem
 - Error de email duplicado: `{ "codigo": "EMAIL_YA_REGISTRADO", "mensaje": "El email ya esta registrado." }`.
 - Error de credenciales invalidas: `{ "codigo": "CREDENCIALES_INVALIDAS", "mensaje": "Email o password invalidos." }`.
 - Error de token invalido: `{ "codigo": "TOKEN_INVALIDO", "mensaje": "Token ausente, invalido o expirado." }`.
+- Error de limite de cuentas: `{ "codigo": "LIMITE_CUENTAS_ALCANZADO", "mensaje": "Alcanzaste el limite de cuentas de tu plan." }`.
+- Error al borrar la cuenta principal: `{ "codigo": "CUENTA_PRINCIPAL_NO_ELIMINABLE", "mensaje": "La cuenta principal no se puede eliminar." }`.
 - Password minimo para MVP: 8 caracteres.
 - Ningun endpoint financiero acepta `userId` en body o query; el backend usa `request.user.id`.
 
@@ -32,14 +34,15 @@ Los endpoints de cuentas, categorias, transacciones, creditos, reportes, proyecc
 
 | Endpoint | Objetivo | Request | Response | Validaciones | Errores |
 | --- | --- | --- | --- | --- | --- |
-| `POST /auth/registro` | Crear usuario. | `email`, `password`, `nombre`. | Usuario basico y token. | Email valido, password fuerte, email unico. | `400`, `409`. |
+| `POST /auth/registro` | Crear usuario y su cuenta principal `id = 0`. | `email`, `password`, `nombre`. | Usuario basico y token; no expone la cuenta. | Email valido, password fuerte, email unico. | `400`, `409`. |
 | `POST /auth/login` | Emitir JWT. | `email`, `password`. | Token y usuario basico. | Credenciales requeridas. | `400`, `401`. |
 | `GET /auth/me` | Obtener sesion actual. | Header JWT. | Usuario autenticado. | Token valido. | `401`. |
 | `PATCH /usuarios/me` | Actualizar perfil financiero. | `nombre`, `monedaBase`. | Usuario actualizado. | Moneda `COP` o `USD`. | `400`, `401`. |
-| `POST /cuentas` | Crear cuenta. | `nombre`, `tipo`, `moneda`, `saldoInicial`. | Cuenta creada. | Moneda valida, monto valido, limite del plan. | `400`, `401`, `429`. |
-| `GET /cuentas` | Listar cuentas del usuario. | Header JWT. | Lista de cuentas. | Token valido. | `401`. |
-| `PATCH /cuentas/:id` | Actualizar cuenta. | Campos editables. | Cuenta actualizada. | Cuenta pertenece al usuario. | `400`, `401`, `404`. |
-| `DELETE /cuentas/:id` | Borrar cuenta. | `id`. | Confirmacion. | Sin transacciones asociadas o regla definida. | `401`, `404`, `409`. |
+| `POST /cuentas` | Crear cuenta. | `nombre`, `tipo`, `moneda`, `saldoInicial`. | Cuenta con `saldoReal`. | DTO valido y limite del plan. | `400`, `401`, `429`. |
+| `GET /cuentas` | Listar cuentas del usuario. | Header JWT. | Cuentas propias con `saldoReal`. | Token valido. | `401`. |
+| `GET /cuentas/:id` | Obtener una cuenta. | `id`. | Cuenta propia con `saldoReal`. | Cuenta pertenece al usuario. | `401`, `404`. |
+| `PATCH /cuentas/:id` | Actualizar cuenta. | `nombre`, `tipo`, `moneda`, `saldoInicial`, todos opcionales. | Cuenta con `saldoReal`. | Cuenta pertenece al usuario. | `400`, `401`, `404`. |
+| `DELETE /cuentas/:id` | Borrar cuenta. | `id`. | `{ "eliminada": true }`. | Cuenta propia y distinta de `id = 0`. | `401`, `404`, `409`. |
 | `POST /categorias` | Crear categoria. | `nombre`, `tipo`. | Categoria creada. | Nombre requerido, tipo valido. | `400`, `401`. |
 | `GET /categorias` | Listar categorias. | Header JWT. | Lista de categorias. | Token valido. | `401`. |
 | `POST /transacciones` | Crear movimiento. | `cuentaId`, `categoriaId`, `tipo`, `monto`, `moneda`, `fecha`, `descripcion`. | Transaccion creada. | Monto mayor a cero, moneda valida, cuenta y categoria propias, limite mensual del plan. | `400`, `401`, `404`, `429`. |
@@ -56,6 +59,18 @@ Los endpoints de cuentas, categorias, transacciones, creditos, reportes, proyecc
 | `POST /ia/recomendaciones` | Recomendar acciones. | Periodo, objetivo, moneda. | Recomendaciones asistidas con disclaimer. | Datos minimizados, limite de plan. | `400`, `401`, `429`. |
 | `POST /ia/proyecciones` | Proyectar con IA. | Horizonte, supuestos, objetivo. | Proyeccion explicada con disclaimer. | Datos minimizados, limite de plan. | `400`, `401`, `429`. |
 
+## DTOs de cuentas
+
+- `POST /cuentas`: `nombre` requerido y no vacio; `tipo` requerido (`bancaria` o `billetera`); `moneda` requerida (`COP` o `USD`); `saldoInicial` numerico requerido.
+- La cuenta principal `id = 0` cuenta dentro del limite del plan. La respuesta de creacion incluye `saldoInicial` y `saldoReal`; sin movimientos ambos son iguales.
+- Listado y detalle calculan `saldoReal`; mientras no existan movimientos, es igual a `saldoInicial`.
+- `PATCH /cuentas/:id`: los mismos campos son opcionales y se validan cuando se envian.
+- `PATCH /cuentas/:id` devuelve la cuenta actualizada con `saldoReal` recalculado y responde `409` si intenta cambiar la moneda de una cuenta con movimientos.
+- `DELETE /cuentas/:id` elimina cuentas propias, responde `404` para cuentas ajenas y `409` para la cuenta principal `id = 0`.
+- El borrado responde `409` si la cuenta tiene movimientos.
+- Propiedades no declaradas, incluidas `usuarioId` y `saldoReal`, son eliminadas por el `ValidationPipe` y nunca llegan al servicio.
+- Requests invalidos responden `400` con `{ "codigo": "REQUEST_INVALIDO", "mensaje": "La solicitud contiene datos invalidos." }`.
+
 ## Riesgos
 
 - Borrar cuentas con transacciones asociadas debe bloquearse o requerir borrado previo.
@@ -67,7 +82,8 @@ Disclaimer: Este contenido fue generado con asistencia de inteligencia artificia
 
 ## Testing
 
-- Suite minima Auth: `npm test`.
+- Suite minima Auth y Cuentas: `npm test`.
+- Cuentas cubre registro con cuenta `id = 0`, creacion, limite de plan, listado aislado, acceso cruzado, saldo real y proteccion de borrado de la cuenta principal.
 - Prueba de autenticacion para endpoints protegidos.
 - Prueba de acceso cruzado entre usuarios.
 - Prueba de validacion de montos, fechas y monedas.
@@ -78,4 +94,4 @@ Disclaimer: Este contenido fue generado con asistencia de inteligencia artificia
 
 ## Proximos pasos
 
-Definir DTOs exactos para implementacion.
+Implementar categorias y los endpoints de transacciones.

@@ -40,6 +40,14 @@ function crearPrismaMock() {
   const estado = {
     plan: { id: "plan-gratis" },
     usuario: null as null | (typeof usuarioBase & { passwordHash: string }),
+    cuenta: null as null | {
+      usuarioId: string;
+      id: number;
+      nombre: string;
+      tipo: string;
+      moneda: string;
+      saldoInicial: number;
+    },
   };
 
   return {
@@ -60,6 +68,10 @@ function crearPrismaMock() {
             nombre: data.nombre,
             planId: data.planId,
             passwordHash: data.passwordHash,
+          };
+          estado.cuenta = {
+            usuarioId: estado.usuario.id,
+            ...data.cuentas.create,
           };
 
           return aplicarSelect(estado.usuario, select);
@@ -158,7 +170,38 @@ test("registro exitoso hashea password, normaliza email y no expone passwordHash
   assert.equal(respuesta.usuario.planId, "plan-gratis");
   assert.ok(estado.usuario?.passwordHash.startsWith("scrypt:"));
   assert.notEqual(estado.usuario?.passwordHash, "password123");
+  assert.deepEqual(estado.cuenta, {
+    usuarioId: "user-1",
+    id: 0,
+    nombre: "Principal",
+    tipo: "BILLETERA",
+    moneda: "COP",
+    saldoInicial: 0,
+  });
   assert.equal("passwordHash" in respuesta.usuario, false);
+  assert.equal("cuentas" in respuesta.usuario, false);
+});
+
+test("registro depende de una escritura atomica de usuario y cuenta por defecto", async () => {
+  const { prisma } = crearPrismaMock();
+  let createRecibido: any;
+  prisma.usuario.create = async (args: any) => {
+    createRecibido = args;
+    throw new Error("fallo creando cuenta");
+  };
+  const service = new AuthService(crearJwtService() as any, prisma as any);
+
+  await assert.rejects(
+    () =>
+      service.registrar({
+        email: "atomico@example.com",
+        password: "password123",
+        nombre: "Camilo",
+      }),
+    /fallo creando cuenta/,
+  );
+
+  assert.equal(createRecibido.data.cuentas.create.id, 0);
 });
 
 test("POST /auth/registro duplicado responde 409", async () => {

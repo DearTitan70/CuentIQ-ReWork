@@ -62,6 +62,15 @@ export class AuthService {
           passwordHash: await hashearPassword(registroDto.password),
           nombre: registroDto.nombre.trim(),
           planId: planGratuito.id,
+          cuentas: {
+            create: {
+              id: 0,
+              nombre: "Principal",
+              tipo: "BILLETERA",
+              moneda: "COP",
+              saldoInicial: 0,
+            },
+          },
         },
         select: usuarioBasicoSelect,
       });
