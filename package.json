@@ -16,7 +16,9 @@
     "check:tarea6": "node scripts/check-tarea6.js",
     "check:tarea7": "node scripts/check-tarea7.js",
     "check:tarea8": "node scripts/check-tarea8.js",
-    "check:tarea9": "node scripts/check-tarea9.js"
+    "check:tarea9": "node scripts/check-tarea9.js",
+    "check:cuentas:tarea1": "node scripts/check-cuentas-tarea1.js",
+    "check:cuentas:tarea2": "node scripts/check-cuentas-tarea2.js"
   },
   "prisma": {
     "seed": "node prisma/seed.js"
